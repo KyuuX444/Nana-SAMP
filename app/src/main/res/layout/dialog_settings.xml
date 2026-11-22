@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <CheckBox
+        android:id="@+id/cbEnableAml"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:checked="true"
+        android:text="Enable Android Mod Loader (AML 1.4.0)" />
+
+    <CheckBox
+        android:id="@+id/cbDisplayFps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:checked="true"
+        android:text="Display FPS &amp; Ping in Multiplayer HUD" />
+
+    <CheckBox
+        android:id="@+id/cbChatTimestamp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:checked="false"
+        android:text="Show [HH:MM:SS] Chat Timestamps" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Custom GTA SA 2.00 Data Directory (blank = auto-detect):" />
+
+    <EditText
+        android:id="@+id/etCustomDataPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="/storage/emulated/0/Android/data/com.nana.samp/files"
+        android:singleLine="true" />
+</LinearLayout>

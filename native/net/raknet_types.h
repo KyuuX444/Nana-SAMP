@@ -1,0 +1,79 @@
+#pragma once
+
+#include <cstdint>
+
+namespace nana::net {
+
+// RakNet Legacy (SA-MP 0.3.7) reliability enum (+6 offset, encoded in 4 bits)
+enum class PacketReliability : uint8_t {
+    UNRELIABLE = 6,
+    UNRELIABLE_SEQUENCED = 7,
+    RELIABLE = 8,
+    RELIABLE_ORDERED = 9,
+    RELIABLE_SEQUENCED = 10,
+};
+
+enum class PacketPriority : uint8_t {
+    SYSTEM = 0,
+    HIGH = 1,
+    MEDIUM = 2,
+    LOW = 3,
+};
+
+// RakNet Legacy (SA-MP 0.3.7) internal & user packet IDs
+enum RakNetPacketId : uint8_t {
+    ID_INTERNAL_PING = 6,
+    ID_PING = 7,
+    ID_PING_OPEN_CONNECTIONS = 8,
+    ID_CONNECTED_PONG = 9,
+    ID_REQUEST_STATIC_DATA = 10,
+    ID_CONNECTION_REQUEST = 11,
+    ID_AUTH_KEY = 12,
+    ID_BROADCAST_PINGS = 15,
+    ID_SECURED_CONNECTION_RESPONSE = 16,
+    ID_SECURED_CONNECTION_CONFIRMATION = 17,
+    ID_RPC_MAPPING = 18,
+    ID_SET_RANDOM_NUMBER_SEED = 19,
+    ID_RPC = 20,
+    ID_RPC_REPLY = 21,
+    ID_DETECT_LOST_CONNECTIONS = 23,
+    ID_OPEN_CONNECTION_REQUEST = 24,
+    ID_OPEN_CONNECTION_REPLY = 25,
+    ID_OPEN_CONNECTION_COOKIE = 26,
+    ID_RSA_PUBLIC_KEY_MISMATCH = 28,
+    ID_CONNECTION_ATTEMPT_FAILED = 29,
+    ID_NEW_INCOMING_CONNECTION = 30,
+    ID_NO_FREE_INCOMING_CONNECTIONS = 31,
+    ID_DISCONNECTION_NOTIFICATION = 32,
+    ID_CONNECTION_LOST = 33,
+    ID_CONNECTION_REQUEST_ACCEPTED = 34,
+    ID_INITIALIZE_ENCRYPTION = 35,
+    ID_CONNECTION_BANNED = 36,
+    ID_INVALID_PASSWORD = 37,
+    ID_MODIFIED_PACKET = 38,
+    ID_PONG = 39,
+    ID_TIMESTAMP = 40,
+    ID_RECEIVED_STATIC_DATA = 41,
+
+    // SA-MP 0.3.7 gameplay sync packets
+    ID_VEHICLE_SYNC = 200,
+    ID_RCON_COMMAND = 201,
+    ID_RCON_RESPONSE = 202,
+    ID_AIM_SYNC = 203,
+    ID_WEAPONS_UPDATE = 204,
+    ID_STATS_UPDATE = 205,
+    ID_BULLET_SYNC = 206,
+    ID_PLAYER_SYNC = 207,
+    ID_MARKERS_SYNC = 208,
+    ID_UNOCCUPIED_SYNC = 209,
+    ID_TRAILER_SYNC = 210,
+    ID_PASSENGER_SYNC = 211,
+    ID_SPECTATOR_SYNC = 212,
+};
+
+static constexpr uint16_t SAMP_COOKIE_XOR = 0x6969;
+static constexpr uint32_t SAMP_037_NETGAME_VERSION = 4057;
+static constexpr size_t MAX_MTU_SIZE = 1492;
+static constexpr size_t SAMP_MTU_SIZE = 576;
+
+} // namespace nana::net

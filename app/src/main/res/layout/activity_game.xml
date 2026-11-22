@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Real GTA San Andreas Android 2.00 Native OpenGL ES SurfaceView -->
+    <SurfaceView
+        android:id="@+id/gameSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- SA-MP 640x480 Virtual TextDraw Overlay (non-intercepting unless SelectTextDraw active) -->
+    <com.nana.samp.ui.TextDrawOverlayView
+        android:id="@+id/textDrawOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- In-Game Multiplayer HUD Overlay -->
+    <FrameLayout
+        android:id="@+id/inGameHudContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp">
+
+        <!-- Top-Left: SA-MP Chat Box -->
+        <LinearLayout
+            android:layout_width="340dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:orientation="vertical">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvChat"
+                android:layout_width="match_parent"
+                android:layout_height="132dp"
+                android:background="#44000000"
+                android:padding="4dp" />
+
+            <!-- Chat / Server Command Input Bar (toggled via Chat button) -->
+            <LinearLayout
+                android:id="@+id/chatInputBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="#DD0F172A"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="4dp"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/etChatInput"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Message or /command..."
+                    android:imeOptions="actionSend"
+                    android:inputType="text"
+                    android:maxLength="128"
+                    android:paddingHorizontal="6dp"
+                    android:singleLine="true"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#94A3B8"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnSendChat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_btn_primary"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Send"
+                    android:textAllCaps="false"
+                    android:textColor="#0B1120"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Top-Right: Multiplayer Status & Quick Actions -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvHudTelemetry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_hud_pill"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="Connecting..."
+                android:textColor="#F8FAFC"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnToggleChat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_action_btn"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Chat"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnScoreboard"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_action_btn"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="TAB"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnPauseMenu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_action_btn"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Menu"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Center GameText Banner -->
+        <TextView
+            android:id="@+id/tvGameTextBanner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="#88000000"
+            android:gravity="center"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:shadowColor="#000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="3"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Bottom-Center: SA-MP Class Selection Bar -->
+        <LinearLayout
+            android:id="@+id/classSelectBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btnClassPrev"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                android:text="&lt;&lt;"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvClassLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="12dp"
+                android:text="Class #0"
+                android:textColor="#F8FAFC"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnClassSpawn"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_btn_primary"
+                android:minWidth="0dp"
+                android:paddingHorizontal="18dp"
+                android:text="SPAWN"
+                android:textColor="#0B1120"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnClassNext"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                android:text="&gt;&gt;"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Pause Menu Overlay -->
+    <FrameLayout
+        android:id="@+id/pauseMenuOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC050812"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="NANA SAMP — PAUSE"
+                android:textColor="@color/accent_cyan"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPauseMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnPauseResume"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_btn_primary"
+                android:text="Resume Game"
+                android:textAllCaps="false"
+                android:textColor="#0B1120"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnPauseScoreboard"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="Player List (TAB)"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/btnPauseReconnect"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="Reconnect Server"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/btnPauseAmlInfo"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="AML 1.4.0 Mods &amp; Diagnostics"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/btnPauseDisconnect"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="Disconnect &amp; Exit to Menu"
+                android:textAllCaps="false"
+                android:textColor="@color/accent_rose"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Authentic SA-MP Loading Overlay (auto-dismissed once GTA SA 2.00 world enters gameplay) -->
+    <LinearLayout
+        android:id="@+id/sampLoadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F2070B14"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <ImageView
+            android:id="@+id/ivLoadingLogo"
+            android:layout_width="220dp"
+            android:layout_height="96dp"
+            android:contentDescription="Nana SAMP Logo"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="NANA SAMP — GTA SA 2.00 NATIVE"
+            android:textColor="@color/accent_cyan"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/pbSampLoading"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="320dp"
+            android:layout_height="12dp"
+            android:layout_marginTop="14dp"
+            android:max="100"
+            android:progress="5" />
+
+        <TextView
+            android:id="@+id/tvLoadingPercent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="5%"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvLoadingConsole"
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:text="Initializing GTA SA 2.00 + AML 1.4.0..."
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+</FrameLayout>

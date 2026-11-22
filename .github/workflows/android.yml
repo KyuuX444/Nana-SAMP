@@ -1,0 +1,209 @@
+name: Nana SAMP Native Android CI (GTA SA 2.00 + AML 1.4.0)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  native-protocol-and-openmp:
+    name: Native C++20 Unit Tests & Live open.mp Multiplayer Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure & compile native C++20 libraries and test suites
+        run: |
+          set -euo pipefail
+          cmake -S native -B build-native -DCMAKE_BUILD_TYPE=Release 2>&1 | tee "${RUNNER_TEMP}/cmake-native.log"
+          cmake --build build-native -j"$(nproc)" 2>&1 | tee -a "${RUNNER_TEMP}/cmake-native.log"
+
+      - name: Run native C++ unit tests (SA-MP Protocol, GPU Compat, File Compat)
+        run: |
+          set -euo pipefail
+          ctest --test-dir build-native --output-on-failure -V 2>&1 | tee "${RUNNER_TEMP}/ctest-native.log"
+
+      - name: Run live open.mp multiplayer integration test (SA-MP 0.3.7 & 0.3.DL-R1)
+        run: |
+          set -euo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libc6:i386 libstdc++6:i386 libatomic1:i386 zlib1g:i386
+
+          OMP_DIR="${RUNNER_TEMP}/openmp-server"
+          mkdir -p "$OMP_DIR"
+          curl -fsSL https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-linux-x86.tar.gz \
+            -o "${OMP_DIR}/omp.tar.gz"
+          tar -xzf "${OMP_DIR}/omp.tar.gz" -C "$OMP_DIR"
+
+          python3 - <<PY
+          import json
+          cfg_path = "${OMP_DIR}/Server/config.json"
+          with open(cfg_path, "r") as f:
+              cfg = json.load(f)
+          cfg["announce"] = False
+          cfg["enable_query"] = True
+          cfg["name"] = "Nana SAMP CI Server (GTA SA 2.00 + AML 1.4.0)"
+          cfg["network"]["port"] = 7777
+          cfg["network"]["allow_037_clients"] = True
+          cfg["artwork"]["enable"] = False
+          cfg["pawn"]["main_scripts"] = ["simpletdm 1"]
+          with open(cfg_path, "w") as f:
+              json.dump(cfg, f, indent=4)
+          PY
+
+          cd "${OMP_DIR}/Server"
+          ./omp-server > "${RUNNER_TEMP}/omp-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true; echo "=== open.mp server log ==="; cat "${RUNNER_TEMP}/omp-server.log" || true' EXIT
+
+          sleep 3
+          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo "::error::open.mp server failed to stay running!"
+            exit 1
+          fi
+
+          "${GITHUB_WORKSPACE}/build-native/test_openmp_integration" 127.0.0.1 7777 2>&1 | tee "${RUNNER_TEMP}/openmp-test.log"
+
+      - name: Upload Native & Live Multiplayer Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nana-samp-native-test-logs
+          path: |
+            ${{ runner.temp }}/cmake-native.log
+            ${{ runner.temp }}/ctest-native.log
+            ${{ runner.temp }}/omp-server.log
+            ${{ runner.temp }}/openmp-test.log
+          if-no-files-found: ignore
+
+  build-and-validate-apk:
+    name: Download Sources, Reverse-Analyze, Compile NDK & Build Nana SAMP APK
+    runs-on: ubuntu-latest
+    needs: native-protocol-and-openmp
+
+    steps:
+      - name: 1. Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: 3-5. Setup Android SDK, Android NDK & CMake
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;26.2.11394342" \
+            "cmake;3.22.1"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 6-9. Download, validate & extract MediaFire sources (Data Alyn + GTA SA 2.00 AML 1.4.0)
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch_and_prepare_sources.py \
+            --work-dir "${RUNNER_TEMP}/nana_sources" \
+            --stage-dir "app/build/generated/gtasa200" \
+            2>&1 | tee "${RUNNER_TEMP}/fetch-sources.log"
+
+      - name: 10. Analyze extracted file structures, ELF binaries, GTA SA 2.00 symbols & AML 1.4.0 exports
+        run: |
+          set -euo pipefail
+          python3 scripts/analyze_sources.py \
+            --work-dir "${RUNNER_TEMP}/nana_sources" \
+            --out-json "${RUNNER_TEMP}/source-analysis.json" \
+            2>&1 | tee "${RUNNER_TEMP}/analyze-sources.log"
+
+      - name: Configure release signing keystore (if configured in repository secrets)
+        env:
+          NANA_KEYSTORE_BASE64: ${{ secrets.NANA_KEYSTORE_BASE64 }}
+          NANA_KEYSTORE_PASSWORD: ${{ secrets.NANA_KEYSTORE_PASSWORD }}
+          NANA_KEY_ALIAS: ${{ secrets.NANA_KEY_ALIAS }}
+          NANA_KEY_PASSWORD: ${{ secrets.NANA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VER_CODE=$((200 + GITHUB_RUN_NUMBER))
+          echo "NANA_VERSION_CODE=${VER_CODE}" >> "$GITHUB_ENV"
+          echo "NANA_VERSION_NAME=2.0.${VER_CODE}-gtasa200-aml140" >> "$GITHUB_ENV"
+          if [ -n "${NANA_KEYSTORE_BASE64:-}" ] && [ -n "${NANA_KEYSTORE_PASSWORD:-}" ] && [ -n "${NANA_KEY_ALIAS:-}" ] && [ -n "${NANA_KEY_PASSWORD:-}" ]; then
+            KS_PATH="${RUNNER_TEMP}/nana-samp-release.jks"
+            printf '%s' "${NANA_KEYSTORE_BASE64}" | tr -d '\r\n ' | base64 --decode > "${KS_PATH}"
+            keytool -list -keystore "${KS_PATH}" -storepass "${NANA_KEYSTORE_PASSWORD}" -alias "${NANA_KEY_ALIAS}" > /dev/null
+            echo "NANA_KEYSTORE_PATH=${KS_PATH}" >> "$GITHUB_ENV"
+            echo "Configured persistent Release signing (versionCode=${VER_CODE})"
+          else
+            echo "No release keystore secrets configured; Release APK will use debug signing config."
+          fi
+
+      - name: Run Android JVM unit tests
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/gradle-unit-test.log"
+
+      - name: 11-12. Compile native NDK libraries (armeabi-v7a) & build Debug + Release APKs
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee "${RUNNER_TEMP}/gradle-build.log"
+          DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          [ -f "$DEBUG_APK" ] || { echo "::error::Missing Debug APK"; exit 1; }
+          [ -f "$RELEASE_APK" ] || { echo "::error::Missing Release APK"; exit 1; }
+          echo "DEBUG_APK_PATH=${DEBUG_APK}" >> "$GITHUB_ENV"
+          echo "RELEASE_APK_PATH=${RELEASE_APK}" >> "$GITHUB_ENV"
+
+      - name: 13. Validate built APKs (aapt2, ABI, native libs, DT_NEEDED audit, symbol checks, apksigner)
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_apk.py "${DEBUG_APK_PATH}" 2>&1 | tee "${RUNNER_TEMP}/validate-debug-apk.log"
+          python3 scripts/validate_apk.py "${RELEASE_APK_PATH}" 2>&1 | tee "${RUNNER_TEMP}/validate-release-apk.log"
+
+      - name: 14. Upload Nana SAMP Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nana-SAMP-GTA200-AML140-Debug-APK
+          path: ${{ env.DEBUG_APK_PATH }}
+          if-no-files-found: error
+
+      - name: 14. Upload Nana SAMP Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nana-SAMP-GTA200-AML140-Release-APK
+          path: ${{ env.RELEASE_APK_PATH }}
+          if-no-files-found: error
+
+      - name: Upload Reverse-Engineering Analysis & Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nana-samp-analysis-and-build-logs
+          path: |
+            ${{ runner.temp }}/fetch-sources.log
+            ${{ runner.temp }}/analyze-sources.log
+            ${{ runner.temp }}/source-analysis.json
+            ${{ runner.temp }}/gradle-unit-test.log
+            ${{ runner.temp }}/gradle-build.log
+            ${{ runner.temp }}/validate-debug-apk.log
+            ${{ runner.temp }}/validate-release-apk.log
+            app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+
+      - name: Cleanup temporary keystore
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/nana-samp-release.jks"
