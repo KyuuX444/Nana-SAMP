@@ -190,7 +190,7 @@ void BindWorldCallbacks() {
         JNIEnv* env = senv.get();
         if (!env) return;
         jstring jurl = SafeNewJString(env, audio.url);
-        env->CallVoidMethod(gListenerGlobal, gOnAudioStream, audio.active ? JNI_TRUE : JNI_FALSE, jurl);
+        env->CallVoidMethod(gListenerGlobal, gOnAudioStream, audio.playing ? JNI_TRUE : JNI_FALSE, jurl);
         env->DeleteLocalRef(jurl);
         if (env->ExceptionCheck()) env->ExceptionClear();
     };
@@ -392,7 +392,7 @@ Java_com_nana_samp_core_NativeClient_nativeGetScoreboardJson(JNIEnv* env, jobjec
     for (size_t i = 0; i < list.size(); ++i) {
         if (i > 0) oss << ",";
         oss << "{\"id\":" << list[i].playerId
-            << ",\"name\":\"" << JsonEscape(list[i].name) << "\""
+            << ",\"name\":\"" << JsonEscape(list[i].nickname) << "\""
             << ",\"score\":" << list[i].score
             << ",\"ping\":" << list[i].ping
             << ",\"color\":" << list[i].colorRgba
@@ -409,9 +409,12 @@ Java_com_nana_samp_core_NativeClient_nativeGetTextDrawsJson(JNIEnv* env, jobject
     oss << "[";
     for (size_t i = 0; i < list.size(); ++i) {
         const auto& td = list[i];
+        int packedFlags = (td.useBox ? 0x01 : 0) |
+                          (td.alignment == 1 ? 0x02 : (td.alignment == 3 ? 0x04 : (td.alignment == 2 ? 0x08 : 0))) |
+                          (td.proportional ? 0x10 : 0);
         if (i > 0) oss << ",";
         oss << "{\"id\":" << td.id
-            << ",\"flags\":" << static_cast<int>(td.flags)
+            << ",\"flags\":" << packedFlags
             << ",\"letterW\":" << td.letterWidth
             << ",\"letterH\":" << td.letterHeight
             << ",\"letterColor\":" << td.letterColorAbgr
@@ -420,11 +423,12 @@ Java_com_nana_samp_core_NativeClient_nativeGetTextDrawsJson(JNIEnv* env, jobject
             << ",\"boxColor\":" << td.boxColorAbgr
             << ",\"shadow\":" << static_cast<int>(td.shadow)
             << ",\"outline\":" << static_cast<int>(td.outline)
-            << ",\"bgColor\":" << td.backgroundColorAbgr
+            << ",\"bgColor\":" << td.bgColorAbgr
             << ",\"style\":" << static_cast<int>(td.style)
             << ",\"selectable\":" << (td.selectable ? "true" : "false")
             << ",\"x\":" << td.x
             << ",\"y\":" << td.y
+            << ",\"modelId\":" << td.modelId
             << ",\"text\":\"" << JsonEscape(td.text) << "\""
             << "}";
     }
@@ -464,8 +468,8 @@ Java_com_nana_samp_core_NativeClient_nativeQueryServerInfoJson(JNIEnv* env, jobj
         static_cast<int>(timeoutMs));
     std::ostringstream oss;
     oss << "{"
-        << "\"reachable\":" << (info.reachable ? "true" : "false") << ","
-        << "\"passworded\":" << (info.passworded ? "true" : "false") << ","
+        << "\"reachable\":" << (info.success ? "true" : "false") << ","
+        << "\"passworded\":" << (info.hasPassword ? "true" : "false") << ","
         << "\"players\":" << info.players << ","
         << "\"maxPlayers\":" << info.maxPlayers << ","
         << "\"pingMs\":" << info.pingMs << ","

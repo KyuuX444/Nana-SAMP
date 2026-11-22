@@ -279,7 +279,7 @@ void GtaSaWorld::BindClientEvents() {
             std::lock_guard<std::mutex> lock(snapshotMutex_);
             cb = callbacks_;
         }
-        if (cb.onClassSelection) cb.onClassSelection(true, static_cast<int>(classId), static_cast<int>(info.skinId));
+        if (cb.onClassSelection) cb.onClassSelection(true, static_cast<int>(classId), static_cast<int>(info.skin));
     };
 
     ev.onLocalSpawn = [this](const nana::net::SpawnInfo& info) {
@@ -290,7 +290,7 @@ void GtaSaWorld::BindClientEvents() {
             std::lock_guard<std::mutex> lock(snapshotMutex_);
             cb = callbacks_;
         }
-        if (cb.onClassSelection) cb.onClassSelection(false, 0, static_cast<int>(info.skinId));
+        if (cb.onClassSelection) cb.onClassSelection(false, 0, static_cast<int>(info.skin));
     };
 
     ev.onShowDialog = [this](const nana::net::DialogData& dlg) {
@@ -359,7 +359,7 @@ void GtaSaWorld::BindClientEvents() {
             std::lock_guard<std::mutex> lock(snapshotMutex_);
             cb = callbacks_;
         }
-        if (cb.onTextDrawSelectChanged) cb.onTextDrawSelectChanged(sel.selecting, sel.hoverColorRgba);
+        if (cb.onTextDrawSelectChanged) cb.onTextDrawSelectChanged(sel.active, sel.hoverColorRgba);
     };
 
     ev.onRemotePlayerStreamIn = [this](const nana::net::RemotePlayerState& p) { SpawnOrUpdateRemotePed(p); };
@@ -696,17 +696,17 @@ void GtaSaWorld::ApplyLocalSpawn(const nana::net::SpawnInfo& spawn) {
     void* ped = syms_.FindPlayerPed ? syms_.FindPlayerPed(-1) : nullptr;
     if (!ped) return;
 
-    if (syms_.CPed_SetModelIndex && spawn.skinId <= 311 && EnsureModelLoaded(static_cast<int>(spawn.skinId))) {
-        syms_.CPed_SetModelIndex(ped, spawn.skinId);
+    if (syms_.CPed_SetModelIndex && spawn.skin <= 311 && EnsureModelLoaded(static_cast<int>(spawn.skin))) {
+        syms_.CPed_SetModelIndex(ped, spawn.skin);
     }
     if (syms_.CPed_Teleport) {
         syms_.CPed_Teleport(ped, GtaVector{spawn.position.x, spawn.position.y, spawn.position.z}, 0);
     }
-    float rad = spawn.rotationDeg * kDegToRad;
+    float rad = spawn.rotation * kDegToRad;
     PedCurrentRotation(ped) = rad;
     PedAimingRotation(ped) = rad;
     if (GtaMatrix* mat = EntityGetMatrix(ped)) {
-        SetMatrixZHeading(mat, spawn.rotationDeg);
+        SetMatrixZHeading(mat, spawn.rotation);
     }
     PedHealth(ped) = 100.0f;
 
@@ -733,7 +733,7 @@ void GtaSaWorld::SpawnOrUpdateRemotePed(const nana::net::RemotePlayerState& st) 
 
     if (!ent.pedPtr) {
         if (!syms_.CPed_OperatorNew || !syms_.CCivilianPed_Ctor || !syms_.CWorld_Add) return;
-        uint32_t skin = (st.skinId <= 311) ? st.skinId : 0;
+        uint32_t skin = (st.skin <= 311) ? st.skin : 0;
         if (!EnsureModelLoaded(static_cast<int>(skin))) return;
 
         void* mem = syms_.CPed_OperatorNew(0x7A4);
@@ -771,7 +771,7 @@ void GtaSaWorld::SpawnOrUpdateRemoteVehicle(const nana::net::RemoteVehicleState&
     auto& ent = remoteVehicles_[st.vehicleId];
     ent.targetPos = st.position;
     ent.velocity = st.velocity;
-    ent.targetAngleDeg = st.rotationDeg;
+    ent.targetAngleDeg = st.angle;
     ent.health = st.health;
 
     if (!ent.vehPtr) {
@@ -939,7 +939,8 @@ void GtaSaWorld::ReadAndPushLocalPlayerSync() {
                 aim.camFront = nana::net::Vec3{front.x, front.y, front.z};
                 aim.camPos = nana::net::Vec3{src.x, src.y, src.z};
                 aim.aimZ = 0.0f;
-                aim.camExtZoomAndWeaponState = 0x3F;
+                aim.camExtZoom = 0x3F;
+                aim.weaponState = 0;
                 aim.aspectRatio = 0x55;
                 client_.UpdateLocalAim(aim);
             }
@@ -1009,7 +1010,7 @@ void GtaSaWorld::ReadAndPushLocalPlayerSync() {
                 } else {
                     nana::net::PassengerSyncData pSync{};
                     pSync.vehicleId = matchedVehId;
-                    pSync.seatFlags = 1;
+                    pSync.seatId = 1;
                     pSync.weapon = PedGetCurrentWeaponId(ped);
                     pSync.health = static_cast<uint8_t>(hp);
                     pSync.armour = static_cast<uint8_t>(arm);
