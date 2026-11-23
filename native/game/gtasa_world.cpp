@@ -229,9 +229,6 @@ bool GtaSaWorld::InitializeHooks(const std::string& storageRoot,
 
     suppressVoid(syms_.CPopulation_ManagePopulation);
     suppressVoid(syms_.CCarCtrl_GenerateRandomCars);
-    suppressVoid(syms_.CTheScripts_Process);
-    suppressVoid(syms_.CCutsceneMgr_Initialise);
-    suppressVoid(syms_.CGangs_Initialise);
     suppressOnePtr(syms_.CAudioEngine_StartLoadingTune);
     suppressOnePtr(syms_.CAEGlobalWeaponAudioEntity_ServiceAmbientGunFire);
     if (syms_.CAEPedSpeechAudioEntity_AddSayEvent) {
@@ -603,18 +600,26 @@ void GtaSaWorld::OnMobileMenuInitTitle(void* menu) {
     if (origMobileMenuInitTitle_) {
         origMobileMenuInitTitle_(menu);
     }
-    if (!newGameTriggered_ && syms_.StartGameScreen_OnNewGameCheck) {
+    if (!newGameTriggered_) {
         newGameTriggered_ = true;
-        WORLD_LOGI("Bypassing singleplayer title screen -> StartGameScreen::OnNewGameCheck()");
-        syms_.StartGameScreen_OnNewGameCheck();
+        WORLD_LOGI("Bypassing singleplayer title screen -> auto-starting game");
+        if (syms_.Menu_NewGame) {
+            syms_.Menu_NewGame();
+        } else if (syms_.gGameState) {
+            *syms_.gGameState = 8;
+        }
     }
 }
 
 uint32_t GtaSaWorld::OnMainMenuScreenUpdate(void* screen, float dt) {
-    if (!newGameTriggered_ && syms_.StartGameScreen_OnNewGameCheck) {
+    if (!newGameTriggered_) {
         newGameTriggered_ = true;
         WORLD_LOGI("MainMenuScreen::Update -> auto-launching multiplayer world");
-        syms_.StartGameScreen_OnNewGameCheck();
+        if (syms_.Menu_NewGame) {
+            syms_.Menu_NewGame();
+        } else if (syms_.gGameState) {
+            *syms_.gGameState = 8;
+        }
     }
     return origMainMenuScreenUpdate_ ? origMainMenuScreenUpdate_(screen, dt) : 0;
 }
@@ -631,9 +636,7 @@ void GtaSaWorld::OnDoGameStateHook() {
         // State 7 = Frontend menu idle; auto-advance into Game Load (8) if not yet triggered
         if (st == 7 && !newGameTriggered_) {
             newGameTriggered_ = true;
-            if (syms_.StartGameScreen_OnNewGameCheck) {
-                syms_.StartGameScreen_OnNewGameCheck();
-            } else if (syms_.Menu_NewGame) {
+            if (syms_.Menu_NewGame) {
                 syms_.Menu_NewGame();
             } else {
                 *syms_.gGameState = 8;
@@ -646,8 +649,8 @@ void GtaSaWorld::OnDoGameStateHook() {
     }
 
     // Keep RakNet networking ticking even while world is still streaming in
+    DrainUiCommands();
     if (!worldReady_) {
-        DrainUiCommands();
         client_.Tick();
         std::lock_guard<std::mutex> lock(snapshotMutex_);
         UpdateSnapshotLocked();

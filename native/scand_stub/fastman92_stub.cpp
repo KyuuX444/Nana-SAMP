@@ -56,12 +56,15 @@ jint PluginLoader_OnLoad(JavaVM* vm, void* reserved, void* callerPc) {
     void* gtaHandle = ResolveGtaSaHandle(callerPc);
     if (gtaHandle != nullptr) {
         auto origOnLoad = reinterpret_cast<JniOnLoadFn>(dlsym(gtaHandle, "Original_JNI_OnLoad"));
+        if (!origOnLoad) {
+            origOnLoad = reinterpret_cast<JniOnLoadFn>(dlsym(gtaHandle, "JNI_OnLoad"));
+        }
         if (origOnLoad != nullptr) {
             jint ver = origOnLoad(vm, reserved);
-            F92_LOGI("Forwarded to libGTASA.so Original_JNI_OnLoad -> 0x%x", ver);
+            F92_LOGI("Forwarded to libGTASA.so JNI_OnLoad -> 0x%x", ver);
             return ver;
         }
-        F92_LOGE("Original_JNI_OnLoad symbol not found in libGTASA.so");
+        F92_LOGE("Neither Original_JNI_OnLoad nor JNI_OnLoad symbol found in libGTASA.so");
     } else {
         F92_LOGE("Failed to obtain libGTASA.so handle in PluginLoader_OnLoad");
     }
@@ -72,6 +75,9 @@ void PluginLoader_OnUnload(JavaVM* vm, void* reserved) {
     void* gtaHandle = ResolveGtaSaHandle(nullptr);
     if (gtaHandle != nullptr) {
         auto origOnUnload = reinterpret_cast<JniOnUnloadFn>(dlsym(gtaHandle, "Original_JNI_OnUnload"));
+        if (!origOnUnload) {
+            origOnUnload = reinterpret_cast<JniOnUnloadFn>(dlsym(gtaHandle, "JNI_OnUnload"));
+        }
         if (origOnUnload != nullptr) {
             origOnUnload(vm, reserved);
         }

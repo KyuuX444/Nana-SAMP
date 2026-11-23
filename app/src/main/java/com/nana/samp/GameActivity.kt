@@ -134,12 +134,20 @@ class GameActivity : WarMedia(), NativeClient.Listener {
                 tvPauseMeta.text = "$serverHost:$serverPort • $nickname • ${snap.amlSummary}"
 
                 if (!loadingDismissed) {
-                    val pct = snap.loadingPercent.coerceIn(5, 100)
+                    val (pct, stageText) = SampLogoLoader.computeLoadingProgress(
+                        eglReady = eglSwapCount > 0,
+                        gameState = snap.gameState,
+                        nativeLoadingPercent = snap.loadingPercent,
+                        texDbLoadedCount = snap.texDbLoaded,
+                        doGameStateTicks = snap.ticks,
+                        worldReady = snap.worldReady
+                    )
                     pbSampLoading.progress = pct
                     tvLoadingPercent.text = "$pct%"
                     tvLoadingConsole.text = buildString {
                         append("Server: $serverHost:$serverPort ($nickname)\n")
                         append("Status: ${snap.status}\n")
+                        append("Stage: $stageText\n")
                         append("Engine state=${snap.gameState} • TexDB=${snap.texDbLoaded} • ${snap.amlSummary}")
                     }
                     if (snap.worldReady || (snap.gameState >= 9 && eglSwapCount > 4)) {
