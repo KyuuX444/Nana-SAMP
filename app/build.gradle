@@ -6,10 +6,13 @@ plugins {
 def resolvedVersionCode = (System.getenv("NANA_VERSION_CODE") ?: "200").toInteger()
 def resolvedVersionName = System.getenv("NANA_VERSION_NAME") ?: "2.0.${resolvedVersionCode}-gtasa200-aml140"
 
-def releaseKeystorePath = System.getenv("NANA_KEYSTORE_PATH")
-def releaseKeystorePassword = System.getenv("NANA_KEYSTORE_PASSWORD")
-def releaseKeyAlias = System.getenv("NANA_KEY_ALIAS")
-def releaseKeyPassword = System.getenv("NANA_KEY_PASSWORD")
+def defaultKeystore = file("${rootDir}/keystore/nana-release.jks")
+def hasDefaultKeystore = defaultKeystore.exists()
+
+def releaseKeystorePath = System.getenv("NANA_KEYSTORE_PATH") ?: (hasDefaultKeystore ? defaultKeystore.absolutePath : null)
+def releaseKeystorePassword = System.getenv("NANA_KEYSTORE_PASSWORD") ?: "nanasamp123"
+def releaseKeyAlias = System.getenv("NANA_KEY_ALIAS") ?: "nanasamp"
+def releaseKeyPassword = System.getenv("NANA_KEY_PASSWORD") ?: "nanasamp123"
 def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword && file(releaseKeystorePath).exists()
 
 android {
@@ -57,12 +60,25 @@ android {
                 enableV2Signing = true
             }
         }
+        debug {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
     }
 
     buildTypes {
         debug {
             minifyEnabled false
             debuggable true
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.debug
+            }
         }
         release {
             minifyEnabled false

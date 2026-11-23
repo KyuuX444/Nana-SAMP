@@ -1,6 +1,8 @@
 package com.nana.samp.core
 
 import android.content.Context
+import android.os.Environment
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -35,8 +37,23 @@ class ServerStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("nana_samp_prefs", Context.MODE_PRIVATE)
 
     var nickname: String
-        get() = prefs.getString("nickname", "NanaPlayer") ?: "NanaPlayer"
-        set(value) { prefs.edit().putString("nickname", sanitizeNickname(value)).apply() }
+        get() {
+            val cached = prefs.getString("nickname", null)
+            if (!cached.isNullOrBlank() && cached != "NanaPlayer") {
+                return cached
+            }
+            val restored = restoreNicknameFromExternal()
+            if (restored.isNotBlank() && restored != "NanaPlayer") {
+                prefs.edit().putString("nickname", restored).apply()
+                return restored
+            }
+            return cached ?: "NanaPlayer"
+        }
+        set(value) {
+            val sanitized = sanitizeNickname(value)
+            prefs.edit().putString("nickname", sanitized).apply()
+            persistNicknameOutside(sanitized)
+        }
 
     var defaultProtocolVersion: Int
         get() = prefs.getInt("protocol_version", NativeBridge.PROTOCOL_037)
@@ -83,31 +100,127 @@ class ServerStore(private val context: Context) {
         return File(GameDataManager.inspect(context).storageRoot)
     }
 
-    private fun serversFile(): File {
-        // Always store in app-private internal filesDir (100% writable on Android 6-16 Scoped Storage
-        // and never overwritten when the user copies GTA SA data into external files/).
-        return File(context.filesDir, "servers.json")
+    /**
+     * Resolves all candidate servers.json locations in priority order:
+     * 1. /sdcard/NanaSAMP/servers.json (public external folder, survives APK uninstall)
+     * 2. /sdcard/Documents/NanaSAMP/servers.json (public documents folder)
+     * 3. <storageRoot>/SAMP/servers.json (GTA SA SAMP data directory)
+     * 4. <storageRoot>/servers.json (GTA SA data root)
+     * 5. <externalFilesDir>/servers.json (/sdcard/Android/data/com.nana.samp/files/servers.json)
+     * 6. <internalFilesDir>/servers.json (/data/data/com.nana.samp/files/servers.json)
+     */
+    fun getServersCandidateFiles(): List<File> {
+        val list = mutableListOf<File>()
+        runCatching {
+            val ext = Environment.getExternalStorageDirectory()
+            if (ext != null) list.add(File(ext, "NanaSAMP/servers.json"))
+        }
+        runCatching {
+            val doc = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            if (doc != null) list.add(File(doc, "NanaSAMP/servers.json"))
+        }
+        runCatching {
+            val gDir = resolveGameDataDir()
+            list.add(File(gDir, "SAMP/servers.json"))
+            list.add(File(gDir, "servers.json"))
+        }
+        runCatching {
+            context.getExternalFilesDir(null)?.let { list.add(File(it, "servers.json")) }
+        }
+        list.add(File(context.filesDir, "servers.json"))
+        return list
+    }
+
+    private fun restoreNicknameFromExternal(): String {
+        for (f in getServersCandidateFiles()) {
+            if (f.isFile && f.canRead()) {
+                val nick = runCatching {
+                    val root = JSONObject(f.readText())
+                    root.optString("nickname", root.optString("username", "")).trim()
+                }.getOrNull()
+                if (!nick.isNullOrBlank() && nick != "NanaPlayer") return sanitizeNickname(nick)
+            }
+        }
+        runCatching {
+            val alyn = AlynSettingsManager.readFromStorage(resolveGameDataDir())
+            if (alyn != null && alyn.nickname.isNotBlank() && alyn.nickname != "NanaPlayer") {
+                return sanitizeNickname(alyn.nickname)
+            }
+        }
+        runCatching {
+            val ext = Environment.getExternalStorageDirectory()
+            if (ext != null) {
+                val uf = File(ext, "NanaSAMP/user.json")
+                if (uf.isFile && uf.canRead()) {
+                    val o = JSONObject(uf.readText())
+                    val nick = o.optString("nickname", o.optString("username", "")).trim()
+                    if (nick.isNotBlank() && nick != "NanaPlayer") return sanitizeNickname(nick)
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun persistNicknameOutside(nick: String) {
+        val sanitized = sanitizeNickname(nick)
+        runCatching {
+            val ext = Environment.getExternalStorageDirectory()
+            if (ext != null) {
+                val uf = File(ext, "NanaSAMP/user.json")
+                uf.parentFile?.mkdirs()
+                uf.writeText(JSONObject().put("nickname", sanitized).put("username", sanitized).toString(2))
+            }
+        }
+        runCatching {
+            val gDir = resolveGameDataDir()
+            val existing = AlynSettingsManager.readFromStorage(gDir) ?: AlynClientSettings()
+            AlynSettingsManager.writeToStorage(gDir, existing.copy(nickname = sanitized))
+        }
+        runCatching {
+            val currentServers = loadServers()
+            if (currentServers.isNotEmpty()) {
+                saveServers(currentServers)
+            }
+        }
     }
 
     fun loadServers(): MutableList<SavedServer> {
-        val f = serversFile()
-        if (f.exists()) {
-            runCatching { return parseServersJson(f.readText()) }
+        for (f in getServersCandidateFiles()) {
+            if (f.isFile && f.canRead()) {
+                val parsed = runCatching {
+                    val content = f.readText()
+                    val pair = parseServersAndNickname(content)
+                    if (pair.second.isNotBlank() && pair.second != "NanaPlayer") {
+                        if (prefs.getString("nickname", "NanaPlayer") == "NanaPlayer") {
+                            prefs.edit().putString("nickname", pair.second).apply()
+                        }
+                    }
+                    pair.first
+                }.getOrNull()
+                if (parsed != null && parsed.isNotEmpty()) {
+                    return parsed
+                }
+            }
         }
         val prefJson = prefs.getString("servers_json_backup", null)
         if (!prefJson.isNullOrBlank()) {
-            runCatching { return parseServersJson(prefJson) }
+            val parsed = runCatching { parseServersAndNickname(prefJson).first }.getOrNull()
+            if (parsed != null && parsed.isNotEmpty()) return parsed
         }
         return mutableListOf()
     }
 
     fun saveServers(servers: List<SavedServer>) {
-        val serialized = serializeServersJson(servers)
+        val serialized = serializeServersJson(servers, nickname)
         prefs.edit().putString("servers_json_backup", serialized).apply()
-        runCatching {
-            val f = serversFile()
-            f.parentFile?.mkdirs()
-            f.writeText(serialized)
+
+        for (f in getServersCandidateFiles()) {
+            runCatching {
+                f.parentFile?.mkdirs()
+                f.writeText(serialized)
+            }.onFailure {
+                Log.d("NanaSAMP-Store", "Could not write servers.json to ${f.absolutePath}: ${it.message}")
+            }
         }
     }
 
@@ -132,8 +245,24 @@ class ServerStore(private val context: Context) {
             }
         }
 
-        fun parseServersJson(json: String): MutableList<SavedServer> {
-            val arr = JSONArray(json)
+        fun parseServersAndNickname(json: String): Pair<MutableList<SavedServer>, String> {
+            val trimmed = json.trim()
+            if (trimmed.startsWith("{")) {
+                val root = JSONObject(trimmed)
+                val nick = root.optString("nickname", root.optString("username", "")).trim()
+                val arr = root.optJSONArray("servers") ?: JSONArray()
+                return Pair(parseServersFromArray(arr), nick)
+            }
+            if (trimmed.startsWith("[")) {
+                return Pair(parseServersFromArray(JSONArray(trimmed)), "")
+            }
+            return Pair(mutableListOf(), "")
+        }
+
+        fun parseServersJson(json: String): MutableList<SavedServer> =
+            parseServersAndNickname(json).first
+
+        fun parseServersFromArray(arr: JSONArray): MutableList<SavedServer> {
             val list = mutableListOf<SavedServer>()
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
@@ -154,7 +283,7 @@ class ServerStore(private val context: Context) {
             return list
         }
 
-        fun serializeServersJson(servers: List<SavedServer>): String {
+        fun serializeServersJson(servers: List<SavedServer>, nickname: String = ""): String {
             val arr = JSONArray()
             for (s in servers) {
                 val o = JSONObject()
@@ -166,7 +295,14 @@ class ServerStore(private val context: Context) {
                 o.put("protocol", s.protocolVersion)
                 arr.put(o)
             }
-            return arr.toString(2)
+            val root = JSONObject()
+            if (nickname.isNotBlank()) {
+                val clean = sanitizeNickname(nickname)
+                root.put("nickname", clean)
+                root.put("username", clean)
+            }
+            root.put("servers", arr)
+            return root.toString(2)
         }
     }
 }

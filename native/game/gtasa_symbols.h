@@ -80,6 +80,8 @@ struct GtaSymbols {
     void* gMobileMenu = nullptr;
     float* gLoadingPercent = nullptr;
     bool* gLoadingActive = nullptr;
+    float* gLoadingFadeAlpha = nullptr;
+    bool* gLoadingFading = nullptr;
     char* gStorageRootBuffer = nullptr;
     char* gStorageBaseRootBuffer = nullptr;
     void* gRqCaps = nullptr;
@@ -95,6 +97,8 @@ struct GtaSymbols {
     uint32_t (*MainMenuScreen_Update)(void* screen, float dt) = nullptr;
     void (*StartGameScreen_OnNewGameCheck)() = nullptr;
     void (*CLoadingScreen_DisplayPCScreen)() = nullptr;
+    void (*CLoadingScreen_Shutdown)(bool force) = nullptr;
+    void (*CLoadingScreen_RenderSplash)() = nullptr;
     void (*CAudioEngine_StartLoadingTune)(void* engine) = nullptr;
     void (*CCutsceneMgr_Initialise)() = nullptr;
     void (*CPopulation_Initialise)() = nullptr;

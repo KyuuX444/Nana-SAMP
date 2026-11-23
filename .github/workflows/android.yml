@@ -148,7 +148,11 @@ jobs:
             echo "NANA_KEYSTORE_PATH=${KS_PATH}" >> "$GITHUB_ENV"
             echo "Configured persistent Release signing (versionCode=${VER_CODE})"
           else
-            echo "No release keystore secrets configured; Release APK will use debug signing config."
+            echo "Using bundled permanent release keystore keystore/nana-release.jks"
+            echo "NANA_KEYSTORE_PATH=${GITHUB_WORKSPACE}/keystore/nana-release.jks" >> "$GITHUB_ENV"
+            echo "NANA_KEYSTORE_PASSWORD=nanasamp123" >> "$GITHUB_ENV"
+            echo "NANA_KEY_ALIAS=nanasamp" >> "$GITHUB_ENV"
+            echo "NANA_KEY_PASSWORD=nanasamp123" >> "$GITHUB_ENV"
           fi
 
       - name: Run Android JVM unit tests

@@ -77,6 +77,16 @@ void AmlCompat::ProbeAndConfigure(const std::string& storageRoot) {
             status_.amlStarted = *startedFlag;
         }
 
+        // Suppress unwanted AML update/news toasts and background downloads
+        auto* pFailedToast = reinterpret_cast<bool*>(dlsym(amlHandle, "g_bShowUpdateFailedToast"));
+        if (pFailedToast != nullptr) *pFailedToast = false;
+        auto* pUpdatedToast = reinterpret_cast<bool*>(dlsym(amlHandle, "g_bShowUpdatedToast"));
+        if (pUpdatedToast != nullptr) *pUpdatedToast = false;
+        auto* pEnableNews = reinterpret_cast<int*>(dlsym(amlHandle, "g_nEnableNews"));
+        if (pEnableNews != nullptr) *pEnableNews = 0;
+        auto* pEnableDownloads = reinterpret_cast<bool*>(dlsym(amlHandle, "g_bEnableFileDownloads"));
+        if (pEnableDownloads != nullptr) *pEnableDownloads = false;
+
         using GetInterfaceFn = void* (*)(const char*);
         auto getIface = reinterpret_cast<GetInterfaceFn>(dlsym(amlHandle, "GetInterface"));
         if (getIface != nullptr) {

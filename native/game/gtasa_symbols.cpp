@@ -50,6 +50,8 @@ bool GtaSymbols::Resolve() {
     bind(gMobileMenu, "gMobileMenu");
     bind(gLoadingPercent, "_ZN14CLoadingScreen15m_PercentLoadedE");
     bind(gLoadingActive, "_ZN14CLoadingScreen9m_bActiveE");
+    bind(gLoadingFadeAlpha, "_ZN14CLoadingScreen11m_FadeAlphaE");
+    bind(gLoadingFading, "_ZN14CLoadingScreen9m_bFadingE");
     bind(gStorageRootBuffer, "StorageRootBuffer");
     bind(gStorageBaseRootBuffer, "StorageBaseRootBuffer");
     bind(gRqCaps, "RQCaps");
@@ -65,6 +67,8 @@ bool GtaSymbols::Resolve() {
     bind(MainMenuScreen_Update, "_ZN14MainMenuScreen6UpdateEf");
     bind(StartGameScreen_OnNewGameCheck, "_ZN15StartGameScreen14OnNewGameCheckEv");
     bind(CLoadingScreen_DisplayPCScreen, "_ZN14CLoadingScreen15DisplayPCScreenEv");
+    bind(CLoadingScreen_Shutdown, "_ZN14CLoadingScreen8ShutdownEb");
+    bind(CLoadingScreen_RenderSplash, "_ZN14CLoadingScreen12RenderSplashEv");
     bind(CAudioEngine_StartLoadingTune, "_ZN12CAudioEngine16StartLoadingTuneEv");
     bind(CCutsceneMgr_Initialise, "_ZN12CCutsceneMgr10InitialiseEv");
     bind(CPopulation_Initialise, "_ZN11CPopulation10InitialiseEv");

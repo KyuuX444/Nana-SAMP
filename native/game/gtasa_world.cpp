@@ -624,6 +624,11 @@ uint32_t GtaSaWorld::OnMainMenuScreenUpdate(void* screen, float dt) {
         if (syms_.gGameState) {
             *syms_.gGameState = 8;
         }
+    } else {
+        // Clear m_bStartGame back to 0 so CLoadingScreen::Shutdown executes cleanly in DoGameState
+        if (syms_.gMobileMenu) {
+            reinterpret_cast<uint8_t*>(syms_.gMobileMenu)[77] = 0;
+        }
     }
     return origMainMenuScreenUpdate_ ? origMainMenuScreenUpdate_(screen, dt) : 0;
 }
@@ -1068,6 +1073,17 @@ void GtaSaWorld::OnGameProcessFrame() {
     if (origCGameProcess_) {
         origCGameProcess_();
     }
+
+    // Ensure singleplayer loading screen and fade-to-black are fully cleared
+    if (syms_.gMobileMenu) {
+        reinterpret_cast<uint8_t*>(syms_.gMobileMenu)[77] = 0;
+    }
+    if (syms_.CLoadingScreen_Shutdown && syms_.gLoadingActive && *syms_.gLoadingActive) {
+        syms_.CLoadingScreen_Shutdown(false);
+    }
+    if (syms_.gLoadingActive) *syms_.gLoadingActive = false;
+    if (syms_.gLoadingFadeAlpha) *syms_.gLoadingFadeAlpha = 0.0f;
+    if (syms_.gLoadingFading) *syms_.gLoadingFading = false;
 
     void* ped = syms_.FindPlayerPed ? syms_.FindPlayerPed(-1) : nullptr;
     if (ped != nullptr && !worldReady_) {

@@ -58,4 +58,31 @@ class AlynSettingsAndServerStoreTest {
         assertEquals("Nana_Player[01]", ServerStore.sanitizeNickname("  Nana_Player[01]  "))
         assertEquals("NanaPlayer", ServerStore.sanitizeNickname("   "))
     }
+
+    @Test
+    fun serializesAndParsesServersAndNicknameOutsideFiles() {
+        val servers = listOf(
+            com.nana.samp.core.SavedServer(
+                id = "127.0.0.1:7777",
+                label = "Local Server",
+                host = "127.0.0.1",
+                port = 7777,
+                password = "pass",
+            )
+        )
+        val serialized = ServerStore.serializeServersJson(servers, "Kyuu_User")
+        val (parsedServers, parsedNick) = ServerStore.parseServersAndNickname(serialized)
+        assertEquals("Kyuu_User", parsedNick)
+        assertEquals(1, parsedServers.size)
+        assertEquals("127.0.0.1", parsedServers[0].host)
+        assertEquals(7777, parsedServers[0].port)
+        assertEquals("pass", parsedServers[0].password)
+
+        // Legacy array parsing backward compatibility
+        val legacyJson = """[{"id":"1.1.1.1:7777","label":"Test","host":"1.1.1.1","port":7777}]"""
+        val (legacyServers, legacyNick) = ServerStore.parseServersAndNickname(legacyJson)
+        assertEquals("", legacyNick)
+        assertEquals(1, legacyServers.size)
+        assertEquals("1.1.1.1", legacyServers[0].host)
+    }
 }

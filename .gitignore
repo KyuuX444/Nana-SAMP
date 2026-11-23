@@ -11,6 +11,7 @@ build-native/
 *.apk
 *.aab
 *.jks
+!keystore/nana-release.jks
 *.keystore
 *.log
 __pycache__/
