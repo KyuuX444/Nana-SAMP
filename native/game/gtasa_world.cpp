@@ -94,7 +94,6 @@ void SetMatrixZHeading(GtaMatrix* mat, float angleDeg) {
 }
 
 // Static hook trampolines
-void Hook_DoGameState() { GtaSaWorld::Instance().OnDoGameStateHook(); }
 void Hook_CGame_Process() { GtaSaWorld::Instance().OnGameProcessFrame(); }
 void Hook_CStreaming_InitImageList() { GtaSaWorld::Instance().OnInitImageListHook(); }
 void Hook_MobileMenu_InitForTitle(void* menu) { GtaSaWorld::Instance().OnMobileMenuInitTitle(menu); }
@@ -191,14 +190,7 @@ bool GtaSaWorld::InitializeHooks(const std::string& storageRoot,
             reinterpret_cast<void**>(&origInitImageList_));
     }
 
-    // 6. Core lifecycle hooks (DoGameState + CGame::Process)
-    if (syms_.DoGameState) {
-        ArmHook::Install(
-            reinterpret_cast<void*>(syms_.DoGameState),
-            reinterpret_cast<void*>(&Hook_DoGameState),
-            reinterpret_cast<void**>(&origDoGameState_));
-    }
-
+    // 6. Core lifecycle hooks (CGame::Process)
     if (syms_.CGame_Process) {
         ArmHook::Install(
             reinterpret_cast<void*>(syms_.CGame_Process),
@@ -484,10 +476,10 @@ void GtaSaWorld::BindClientEvents() {
 
 void GtaSaWorld::ConnectAsync(const std::string& host, uint16_t port,
                               const std::string& nickname, const std::string& password) {
+    client_.Connect(host, port, nickname, password, nana::net::ProtocolVersion::SAMP_037);
     std::lock_guard<std::mutex> lock(cmdMutex_);
-    pendingCommands_.push_back([this, host, port, nickname, password]() {
+    pendingCommands_.push_back([this]() {
         CleanupAllRemoteEntities();
-        client_.Connect(host, port, nickname, password, nana::net::ProtocolVersion::SAMP_037);
     });
 }
 
@@ -602,59 +594,38 @@ void GtaSaWorld::OnMobileMenuInitTitle(void* menu) {
     }
     if (!newGameTriggered_) {
         newGameTriggered_ = true;
-        WORLD_LOGI("Bypassing singleplayer title screen -> auto-starting game");
-        if (syms_.Menu_NewGame) {
-            syms_.Menu_NewGame();
-        } else if (syms_.gGameState) {
+        WORLD_LOGI("OnMobileMenuInitTitle -> setting m_bStartGame = 1 & gGameState = 8");
+        if (menu) {
+            reinterpret_cast<uint8_t*>(menu)[77] = 1;
+        }
+        if (syms_.gMobileMenu) {
+            reinterpret_cast<uint8_t*>(syms_.gMobileMenu)[77] = 1;
+        }
+        if (syms_.gGameState) {
             *syms_.gGameState = 8;
         }
     }
 }
 
 uint32_t GtaSaWorld::OnMainMenuScreenUpdate(void* screen, float dt) {
-    if (!newGameTriggered_) {
-        newGameTriggered_ = true;
-        WORLD_LOGI("MainMenuScreen::Update -> auto-launching multiplayer world");
-        if (syms_.Menu_NewGame) {
-            syms_.Menu_NewGame();
-        } else if (syms_.gGameState) {
-            *syms_.gGameState = 8;
-        }
-    }
-    return origMainMenuScreenUpdate_ ? origMainMenuScreenUpdate_(screen, dt) : 0;
-}
-
-void GtaSaWorld::OnDoGameStateHook() {
     doGameStateTicks_.fetch_add(1, std::memory_order_relaxed);
-
-    if (syms_.gGameState) {
-        int st = *syms_.gGameState;
-        if (st != lastLoggedGameState_) {
-            lastLoggedGameState_ = st;
-            WORLD_LOGI("gGameState -> %d", st);
-        }
-        // State 7 = Frontend menu idle; auto-advance into Game Load (8) if not yet triggered
-        if (st == 7 && !newGameTriggered_) {
-            newGameTriggered_ = true;
-            if (syms_.Menu_NewGame) {
-                syms_.Menu_NewGame();
-            } else {
-                *syms_.gGameState = 8;
-            }
-        }
-    }
-
-    if (origDoGameState_) {
-        origDoGameState_();
-    }
-
-    // Keep RakNet networking ticking even while world is still streaming in
     DrainUiCommands();
     if (!worldReady_) {
         client_.Tick();
         std::lock_guard<std::mutex> lock(snapshotMutex_);
         UpdateSnapshotLocked();
     }
+    if (!newGameTriggered_) {
+        newGameTriggered_ = true;
+        WORLD_LOGI("MainMenuScreen::Update -> setting m_bStartGame = 1 & gGameState = 8");
+        if (syms_.gMobileMenu) {
+            reinterpret_cast<uint8_t*>(syms_.gMobileMenu)[77] = 1;
+        }
+        if (syms_.gGameState) {
+            *syms_.gGameState = 8;
+        }
+    }
+    return origMainMenuScreenUpdate_ ? origMainMenuScreenUpdate_(screen, dt) : 0;
 }
 
 // ---- Entity & World Streaming ----
@@ -1063,7 +1034,15 @@ ClientUiSnapshot GtaSaWorld::GetSnapshot() const {
         std::lock_guard<std::mutex> lock(snapshotMutex_);
         out = snapshot_;
     }
-    out.gameState = syms_.gGameState ? *syms_.gGameState : -1;
+    if (syms_.gGameState) {
+        int st = *syms_.gGameState;
+        out.gameState = st;
+        if (st >= 0) {
+            doGameStateTicks_.fetch_add(1, std::memory_order_relaxed);
+        }
+    } else {
+        out.gameState = -1;
+    }
     if (syms_.gLoadingPercent) {
         float pct = *syms_.gLoadingPercent;
         if (std::isfinite(pct)) {

@@ -634,7 +634,7 @@ object SampLogoLoader {
         worldReady: Boolean
     ): Pair<Int, String> {
         if (worldReady) return 100 to "San Andreas Ready — Connecting to Server..."
-        if (!eglReady && doGameStateTicks <= 0) {
+        if (!eglReady && gameState < 0) {
             return 8 to "Initializing OpenGL ES 2.0 & Engine..."
         }
         val texBonus = texDbLoadedCount.coerceIn(0, 6) * 2

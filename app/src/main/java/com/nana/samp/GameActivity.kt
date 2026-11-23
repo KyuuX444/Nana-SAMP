@@ -155,7 +155,7 @@ class GameActivity : WarMedia(), NativeClient.Listener {
                     }
                 }
             }
-            uiHandler.postDelayed(this, 250L)
+            uiHandler.postDelayed(this, 50L)
         }
     }
 

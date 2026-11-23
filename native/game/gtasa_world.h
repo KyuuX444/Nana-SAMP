@@ -94,7 +94,6 @@ public:
     std::vector<nana::net::ScoreboardEntry> GetScoreboardSnapshot() const;
 
     // Hook callbacks invoked on the GTA SA game thread
-    void OnDoGameStateHook();
     void OnGameProcessFrame();
     void OnInitImageListHook();
     void OnMobileMenuInitTitle(void* menu);
@@ -161,11 +160,10 @@ private:
     nana::net::Vec3 pendingCamPos_{};
     bool hasPendingCamPos_ = false;
 
-    std::atomic<int> doGameStateTicks_{0};
+    mutable std::atomic<int> doGameStateTicks_{0};
     int lastLoggedGameState_ = -999;
 
     // Original trampoline pointers populated by ArmHook::Install
-    void (*origDoGameState_)() = nullptr;
     void (*origCGameProcess_)() = nullptr;
     void (*origInitImageList_)() = nullptr;
     void (*origMobileMenuInitTitle_)(void* menu) = nullptr;
